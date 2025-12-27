@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube Trending Analyzer</title>
+  <style>
+    :root {
+      /* Fast3D Inspired Theme - Deep Dark & Green Accents */
+      --bg: #050505;
+      --panel: #111111;
+      --card: #161616;
+      --accent: #22c55e; /* Vibrant Green */
+      --accent-hover: #16a34a;
+      --text: #ffffff;
+      --muted: #9ca3af;
+      --border: #27272a;
+      --input-bg: #1f1f1f;
+      --radius: 12px;
+      --shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background-color: var(--bg);
+      /* Subtle green glow at the top */
+      background-image: radial-gradient(circle at 50% -20%, rgba(34, 197, 94, 0.15), transparent 40%);
+      color: var(--text);
+      padding: 32px 20px 48px;
+      line-height: 1.5;
+    }
+    .shell {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      gap: 32px;
+      position: relative;
+    }
+    header {
+      text-align: center;
+      padding: 40px 0 20px;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      position: relative;
+    }
+    h1 { 
+      margin: 0 0 16px; 
+      font-size: 42px; 
+      font-weight: 700; 
+      letter-spacing: -0.03em;
+      color: var(--accent);
+      text-shadow: 0 0 40px rgba(34, 197, 94, 0.3);
+    }
+    p.sub { margin: 0; color: var(--muted); font-size: 18px; font-weight: 400; }
+
+    /* Toggle Switch - Dark Mode Style */
+    .lang-switch {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      z-index: 10;
+      background: rgba(255,255,255,0.05);
+      padding: 8px 16px;
+      border-radius: 30px;
+      border: 1px solid var(--border);
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #333;
+      transition: .3s;
+      border-radius: 34px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+    input:checked + .slider { background-color: var(--accent); }
+    input:checked + .slider:before { transform: translateX(20px); }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      box-shadow: var(--shadow);
+    }
+    form {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 24px;
+      align-items: end;
+    }
+    label { 
+      font-size: 13px; 
+      color: var(--muted); 
+      display: block; 
+      margin-bottom: 8px; 
+      font-weight: 500;
+    }
+    input, select {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 15px;
+      transition: all 0.2s ease;
+    }
+    input:focus, select:focus { 
+      outline: none; 
+      border-color: var(--accent); 
+      box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2); 
+      background: #262626;
+    }
+    /* Custom Select Arrow */
+    select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+      background-position: right 0.75rem center;
+      background-repeat: no-repeat;
+      background-size: 1.25em 1.25em;
+      padding-right: 2.5rem;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .actions { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+    
+    button {
+      border: none;
+      cursor: pointer;
+      border-radius: 8px;
+      padding: 14px 28px;
+      font-weight: 600;
+      font-size: 15px;
+      color: #000; /* Black text on green button for contrast */
+      background-color: var(--accent);
+      transition: all 0.2s;
+      letter-spacing: 0.01em;
+    }
+    button:hover { 
+      background-color: var(--accent-hover); 
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+    }
+    button:active { transform: translateY(0); }
+
+    .status { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+
+    .results { display: grid; gap: 20px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      transition: transform 0.2s, border-color 0.2s;
+      display: grid;
+      gap: 12px;
+    }
+    .card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+    .card h3 { margin: 0; font-size: 20px; font-weight: 600; color: var(--text); line-height: 1.4; }
+    .meta { color: var(--muted); font-size: 14px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+    .metrics { display: flex; gap: 20px; flex-wrap: wrap; font-size: 15px; color: #e5e7eb; }
+    
+    .badge { 
+      padding: 4px 12px; 
+      border-radius: 20px; 
+      background: rgba(34, 197, 94, 0.15); 
+      color: var(--accent); 
+      font-weight: 600; 
+      font-size: 13px; 
+      border: 1px solid rgba(34, 197, 94, 0.2);
+    }
+    .revenue { color: #fbbf24; font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+    .trend { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top: 4px; }
+    .spark { width: 140px; height: 40px; opacity: 0.9; }
+    
+    .url a { 
+      color: var(--text); 
+      text-decoration: none; 
+      font-weight: 500; 
+      border-bottom: 1px solid var(--accent);
+      padding-bottom: 2px;
+      transition: color 0.2s;
+    }
+    .url a:hover { color: var(--accent); }
+
+    .empty { 
+      text-align: center; 
+      color: var(--muted); 
+      padding: 48px; 
+      border: 1px dashed var(--border); 
+      border-radius: var(--radius); 
+      background: rgba(255,255,255,0.02);
+    }
+
+    @media (max-width: 640px) {
+      form { grid-template-columns: 1fr; }
+      .row { grid-template-columns: 1fr; }
+      h1 { font-size: 32px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="lang-switch">
+      <span>EN</span>
+      <label class="switch">
+        <input type="checkbox" id="langToggle">
+        <span class="slider"></span>
+      </label>
+      <span>中</span>
+    </div>
+    <header>
+      <h1 data-i18n="title">YouTube Trending Analyzer</h1>
+      <p class="sub" data-i18n="subtitle">A web app to quickly find videos you love.</p>
+    </header>
+
+    <section class="panel">
+      <form id="form">
+        <div>
+          <label data-i18n="mode_label">Mode</label>
+          <select name="input_type" id="input_type">
+            <option value="keyword" selected data-i18n="mode_keyword">Keyword</option>
+            <option value="channel" data-i18n="mode_channel">Channel</option>
+          </select>
+        </div>
+        <div>
+          <label data-i18n="input_label">Keyword / Channel URL</label>
+          <input name="value" id="value" placeholder="e.g. life hacks" list="suggestions" required data-i18n-placeholder="input_placeholder" />
+          <datalist id="suggestions"></datalist>
+        </div>
+        <div class="row">
+          <div>
+            <label data-i18n="min_views">Min Views</label>
+            <input type="number" name="min_views" id="min_views" value="50000" min="0" />
+          </div>
+          <div>
+            <label data-i18n="min_engagement">Min Engagement (%)</label>
+            <input type="number" step="0.1" name="min_engagement" id="min_engagement" value="2.0" min="0" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label data-i18n="max_days">Max Days (Freshness)</label>
+            <input type="number" name="max_days" id="max_days" value="14" min="1" />
+          </div>
+          <div>
+            <label data-i18n="max_results">Max Results</label>
+            <input type="number" name="max_results" id="max_results" value="30" min="1" max="50" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label data-i18n="language_label">Language</label>
+            <select name="language" id="language">
+              <option value="en" selected>English (en)</option>
+              <option value="zh">中文 (zh)</option>
+              <option value="es">Español (es)</option>
+              <option value="" data-i18n="lang_auto">Auto (Any)</option>
+            </select>
+          </div>
+          <div>
+            <label data-i18n="region_label">Region</label>
+            <select name="region" id="region">
+              <option value="US" selected>United States (US)</option>
+              <option value="GB">United Kingdom (GB)</option>
+              <option value="CA">Canada (CA)</option>
+              <option value="AU">Australia (AU)</option>
+              <option value="MX">Mexico (MX)</option>
+              <option value="DE">Germany (DE)</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label data-i18n="min_duration">Min Duration (s)</label>
+            <input type="number" name="min_duration" id="min_duration" value="60" min="0" />
+          </div>
+          <div>
+            <label data-i18n="max_duration">Max Duration (s)</label>
+            <input type="number" name="max_duration" id="max_duration" value="900" min="0" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label data-i18n="cpm_low">Min CPM ($)</label>
+            <input type="number" step="0.1" name="cpm_low" id="cpm_low" value="2.0" min="0" />
+          </div>
+          <div>
+            <label data-i18n="cpm_high">Max CPM ($)</label>
+            <input type="number" step="0.1" name="cpm_high" id="cpm_high" value="4.0" min="0" />
+          </div>
+        </div>
+        <div class="actions">
+          <button type="submit" data-i18n="btn_analyze">Analyze</button>
+          <div class="status" id="status">
+            <span class="dot"></span>
+            <span data-i18n="status_waiting">Ready</span>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="results" id="results">
+        <div class="empty" data-i18n="empty_state">Not run yet. Fill in parameters and click "Analyze".</div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const form = document.getElementById('form');
+    const statusEl = document.getElementById('status').querySelector('span:last-child');
+    const resultsEl = document.getElementById('results');
+    const valueInput = document.getElementById('value');
+    const datalistEl = document.getElementById('suggestions');
+    const langToggle = document.getElementById('langToggle');
+
+    const formatNumber = (n) => n.toLocaleString('en-US');
+
+    const translations = {
+      en: {
+        title: "YouTube Trending Analyzer",
+        subtitle: "A web app to quickly find videos you love.",
+        mode_label: "Mode",
+        mode_keyword: "Keyword",
+        mode_channel: "Channel",
+        input_label: "Keyword / Channel URL",
+        input_placeholder: "e.g. life hacks",
+        min_views: "Min Views",
+        min_engagement: "Min Engagement (%)",
+        max_days: "Max Days (Freshness)",
+        max_results: "Max Results",
+        language_label: "Language",
+        region_label: "Region",
+        min_duration: "Min Duration (s)",
+        max_duration: "Max Duration (s)",
+        cpm_low: "Min CPM ($)",
+        cpm_high: "Max CPM ($)",
+        btn_analyze: "Analyze",
+        status_waiting: "Ready",
+        status_processing: "Processing...",
+        status_done: "Done: {count} results",
+        status_error: "Error: {message}",
+        empty_state: "Not run yet. Fill in parameters and click \"Analyze\".",
+        empty_no_results: "No videos found. Hint: Check your channel URL or try different keywords/regions.",
+        empty_loading: "Fetching and analyzing, please wait...",
+        lang_auto: "Auto (Any)",
+        
+        // Dynamic result cards
+        card_heat: "Heat Score",
+        card_days_ago: "days ago",
+        card_channel: "Channel",
+        card_duration: "Duration",
+        card_views: "Views",
+        card_likes: "Likes",
+        card_comments: "Comments",
+        card_engagement: "Engage",
+        card_revenue: "Est. Revenue",
+        card_revenue_range: "Low ${low} - High ${high}",
+        card_reasons: "Hot Reasons",
+        card_trend: "Trend",
+        card_daily: "daily views",
+        card_open: "Open Video",
+        
+        // Hot Reasons
+        high_engagement: "High Engagement (>=4%)",
+        good_engagement: "Good Engagement (>=2.5%)",
+        high_like_rate: "High Like Rate (>=2%)",
+        high_comment_rate: "High Discussion",
+        optimal_duration: "Optimal Duration (4-10m)",
+        short_duration: "Fast Paced (1-4m)",
+        fresh_7d: "New (<7 days)",
+        fresh_14d: "Recent (<14 days)",
+        title_clickbait: "High CTR Keywords",
+        high_views: "High Social Proof",
+        general_good: "Good Metrics"
+      },
+      zh: {
+        title: "YouTube 热门视频分析",
+        subtitle: "一个能让你快速找到你喜欢看的视频的网页。",
+        mode_label: "模式",
+        mode_keyword: "关键词",
+        mode_channel: "频道",
+        input_label: "关键词 / 频道链接",
+        input_placeholder: "例如：life hacks",
+        min_views: "最低播放量",
+        min_engagement: "最低互动率 (%)",
+        max_days: "最长天数 (新鲜度)",
+        max_results: "分析数量",
+        language_label: "语言",
+        region_label: "地区",
+        min_duration: "时长下限 (秒)",
+        max_duration: "时长上限 (秒)",
+        cpm_low: "CPM 下限 ($)",
+        cpm_high: "CPM 上限 ($)",
+        btn_analyze: "开始分析",
+        status_waiting: "等待运行",
+        status_processing: "正在分析...",
+        status_done: "完成：共 {count} 个结果",
+        status_error: "错误：{message}",
+        empty_state: "尚未运行，填写参数后点击“开始分析”",
+        empty_no_results: "没有找到符合条件的视频。提示：如输入为“频道”请填写有效频道URL或ID；如输入中文关键词，可选择语言为“中文”。",
+        empty_loading: "正在抓取并计算，请稍候...",
+        lang_auto: "自动 (不限制)",
+
+        // Dynamic result cards
+        card_heat: "热度",
+        card_days_ago: "天前",
+        card_channel: "频道",
+        card_duration: "时长",
+        card_views: "播放",
+        card_likes: "点赞",
+        card_comments: "评论",
+        card_engagement: "互动率",
+        card_revenue: "预估收益",
+        card_revenue_range: "低 ${low} - 高 ${high}",
+        card_reasons: "爆红原因",
+        card_trend: "趋势",
+        card_daily: "日均播放",
+        card_open: "打开视频",
+
+        // Hot Reasons
+        high_engagement: "互动率高 (>=4%)",
+        good_engagement: "互动率良好 (>=2.5%)",
+        high_like_rate: "点赞率高 (>=2%)",
+        high_comment_rate: "评论活跃",
+        optimal_duration: "时长适中 (4-10分钟)",
+        short_duration: "短时长快节奏",
+        fresh_7d: "7天内新视频",
+        fresh_14d: "14天内新视频",
+        title_clickbait: "标题含高点击词",
+        high_views: "播放基数大",
+        general_good: "综合指标良好"
+      }
+    };
+
+    let currentLang = 'en';
+
+    function updateLanguage(lang) {
+      currentLang = lang;
+      const t = translations[lang];
+      
+      // Update static elements
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (t[key]) el.textContent = t[key];
+      });
+
+      // Update placeholders
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (t[key]) el.placeholder = t[key];
+      });
+
+      // Update status if idle
+      if (statusEl.textContent === translations['en'].status_waiting || statusEl.textContent === translations['zh'].status_waiting) {
+        statusEl.textContent = t.status_waiting;
+      }
+    }
+
+    langToggle.addEventListener('change', (e) => {
+      updateLanguage(e.target.checked ? 'zh' : 'en');
+    });
+
+    // 加载建议列表
+    (async function loadSuggestions(){
+      try {
+        const res = await fetch('/api/suggestions');
+        const data = await res.json();
+        const list = (data && data.suggestions) || [];
+        datalistEl.innerHTML = list.map(s => `<option value="${s}"></option>`).join('');
+      } catch {}
+    })();
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = new FormData(form);
+      const qs = new URLSearchParams();
+      data.forEach((v, k) => qs.append(k, v));
+
+      const t = translations[currentLang];
+      statusEl.textContent = t.status_processing;
+      resultsEl.innerHTML = `<div class="empty">${t.empty_loading}</div>`;
+
+      try {
+        const res = await fetch(`/api/analyze?${qs.toString()}`);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Request failed');
+        }
+        const payload = await res.json();
+        statusEl.textContent = t.status_done.replace('{count}', payload.count);
+        renderResults(payload.items || []);
+      } catch (err) {
+        statusEl.textContent = t.status_error.replace('{message}', err.message);
+        resultsEl.innerHTML = `<div class="empty" style="color: var(--danger);">${err.message}</div>`;
+      }
+    });
+
+    function renderResults(items) {
+      const t = translations[currentLang];
+      if (!items.length) {
+        resultsEl.innerHTML = `<div class="empty">${t.empty_no_results}</div>`;
+        return;
+      }
+      resultsEl.innerHTML = items.map((v, idx) => `
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+            <h3>${idx + 1}. ${v.title}</h3>
+            <span class="badge">${t.card_heat} ${Math.round(v.heat_score)}</span>
+          </div>
+          <div class="meta">
+            <span>${v.published_at} · ${v.days_since_published} ${t.card_days_ago}</span>
+            <span>${t.card_channel}：${v.channel_title}</span>
+            <span>${t.card_duration}：${v.duration}</span>
+          </div>
+          <div class="metrics">
+            <span>${t.card_views}：${formatNumber(v.view_count)}</span>
+            <span>${t.card_likes}：${formatNumber(v.like_count)}</span>
+            <span>${t.card_comments}：${formatNumber(v.comment_count)}</span>
+            <span>${t.card_engagement}：${v.engagement_rate}%</span>
+          </div>
+          <div class="revenue">💰 ${t.card_revenue}：$${formatNumber(v.revenue_mid)} (${t.card_revenue_range.replace('${low}', formatNumber(v.revenue_low)).replace('${high}', formatNumber(v.revenue_high))})</div>
+          <div class="metrics" style="color:#f8fafc; font-weight:600;">⭐ ${t.card_reasons}：${(v.hot_reasons || []).map(r => t[r] || r).slice(0,4).join('; ')}</div>
+          <div class="trend">
+            <span style="color:var(--muted);">${t.card_trend}：${v.trend_label} · ${formatNumber(v.avg_daily_views || 0)} ${t.card_daily}</span>
+            ${renderSpark(v.trend_points || [])}
+          </div>
+          <div class="url">🔗 <a href="${v.url}" target="_blank" rel="noopener noreferrer">${t.card_open}</a></div>
+        </div>
+      `).join('');
+    }
+
+    function renderSpark(points) {
+      if (!points.length) return '';
+      const w = 140, h = 40, pad = 4;
+      const max = Math.max(...points);
+      const min = Math.min(...points);
+      const span = Math.max(1, max - min);
+      const step = (w - pad * 2) / Math.max(1, points.length - 1);
+      
+      // Generate points for the line
+      const coords = points.map((v, i) => {
+        const x = pad + i * step;
+        const y = h - pad - ((v - min) / span) * (h - pad * 2);
+        return [x, y];
+      });
+
+      // Create smooth bezier curve path
+      let pathD = `M${coords[0][0].toFixed(2)},${coords[0][1].toFixed(2)}`;
+      for (let i = 0; i < coords.length - 1; i++) {
+        const [x0, y0] = coords[i];
+        const [x1, y1] = coords[i + 1];
+        const mx = (x0 + x1) / 2;
+        pathD += ` C${mx.toFixed(2)},${y0.toFixed(2)} ${mx.toFixed(2)},${y1.toFixed(2)} ${x1.toFixed(2)},${y1.toFixed(2)}`;
+      }
+
+      // Create fill area path (close the loop)
+      const fillD = `${pathD} L${w-pad},${h} L${pad},${h} Z`;
+
+      return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="grad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#22c55e;stop-opacity:0.4" />
+            <stop offset="100%" style="stop-color:#22c55e;stop-opacity:0" />
+          </linearGradient>
+        </defs>
+        <path d="${fillD}" fill="url(#grad)" stroke="none" />
+        <path d="${pathD}" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <circle cx="${coords[coords.length-1][0]}" cy="${coords[coords.length-1][1]}" r="3" fill="#22c55e" />
+      </svg>`;
+    }
+  </script>
+</body>
+</html>
