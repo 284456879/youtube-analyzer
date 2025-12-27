@@ -1,18 +1,7 @@
-# YouTube视频热度分析工具 - 依赖包
-
-# YouTube API客户端
-google-api-python-client==2.108.0
-google-auth==2.25.2
-google-auth-oauthlib==1.2.0
-google-auth-httplib2==0.2.0
-
-# 数据处理
-pandas==2.1.4
-openpyxl==3.1.2
-
-# Web服务
-flask==3.0.0
-gunicorn==21.2.0
-
-# 可选：使用yt-dlp作为备选方案（无需API key）
-# yt-dlp==2023.12.30
+flask
+gunicorn
+google-api-python-client
+google-auth-oauthlib
+google-auth-httplib2
+pandas
+openpyxl
