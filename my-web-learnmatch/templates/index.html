@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>专注力大冒险 - Schulte Grid</title>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #eef2f7;
+            color: #333;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            background-color: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            max-width: 600px;
+            width: 90%;
+            margin-top: 2rem;
+        }
+        h1 { color: #2c3e50; margin-bottom: 0.5rem; }
+        .subtitle { color: #7f8c8d; margin-bottom: 2rem; }
+        
+        /* Face Auth */
+        #video-container {
+            position: relative;
+            width: 320px;
+            height: 240px;
+            margin: 0 auto 20px;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            display: none;
+        }
+        #webcam {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        #face-status {
+            margin-top: 5px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        /* Game Grid */
+        #game-board {
+            display: grid;
+            gap: 10px;
+            margin: 20px auto;
+            justify-content: center;
+            /* Grid template columns will be set by JS */
+        }
+        .grid-cell {
+            width: 60px;
+            height: 60px;
+            background-color: #3498db;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 8px;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.1s, background-color 0.2s;
+        }
+        .grid-cell:active { transform: scale(0.95); }
+        .grid-cell.correct { background-color: #2ecc71; visibility: hidden; } /* Option: hide or dim */
+        .grid-cell.wrong { animation: shake 0.4s; background-color: #e74c3c; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        /* Controls */
+        .controls { margin: 20px 0; }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #f1c40f;
+            border: none;
+            border-radius: 20px;
+            color: #2c3e50;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover { background-color: #f39c12; }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+        }
+        .hidden { display: none; }
+
+        /* Dashboard */
+        #dashboard { margin-top: 2rem; text-align: left; }
+        .record-item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Stroop Game */
+        #stroop-word {
+            font-size: 80px;
+            font-weight: bold;
+            margin: 40px 0;
+        }
+        .stroop-options {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        .stroop-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .stroop-btn:active { transform: scale(0.9); }
+        
+        .mode-switch {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        .mode-btn {
+            padding: 8px 16px;
+            border: 2px solid #3498db;
+            background: white;
+            color: #3498db;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .mode-btn.active {
+            background: #3498db;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🚀 专注力大冒险</h1>
+        <p class="subtitle" id="game-subtitle">舒尔特方格训练</p>
+
+        <!-- Menu / Stats -->
+        <div id="menu-screen">
+            <div class="mode-switch">
+                <button class="mode-btn active" onclick="switchMode('schulte')">🔢 数字方格</button>
+                <button class="mode-btn" onclick="switchMode('stroop')">🎨 颜色挑战</button>
+            </div>
+
+            <div id="video-container">
+                <video id="webcam" autoplay muted playsinline></video>
+            </div>
+            <div id="face-status"></div>
+
+            <div class="controls">
+                <div style="margin-bottom: 15px; display: flex; justify-content: center; gap: 10px;">
+                    <div>
+                        <label for="player-name">你的名字: </label>
+                        <input type="text" id="player-name" placeholder="请输入名字" style="padding: 5px; border-radius: 5px; border: 1px solid #ccc;">
+                    </div>
+                    <button onclick="startFaceAuth()" style="padding: 5px 10px; font-size: 14px; background-color: #3498db; color: white;">📷 刷脸登录</button>
+                </div>
+                
+                <div id="schulte-controls">
+                    <label for="grid-size">难度选择: </label>
+                    <select id="grid-size" style="padding: 5px; border-radius: 5px;">
+                        <option value="3">初级 (3x3)</option>
+                        <option value="4">中级 (4x4)</option>
+                        <option value="5" selected>高级 (5x5)</option>
+                    </select>
+                </div>
+            </div>
+            <button onclick="startGame()">开始任务</button>
+            
+            <div class="instructions" style="margin: 20px 0; text-align: left; background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                <h3 style="margin-top: 0; color: #2c3e50; font-size: 1.1rem;">📖 游戏说明</h3>
+                <ul id="game-instructions" style="padding-left: 20px; color: #555; margin-bottom: 0;">
+                    <!-- Instructions will be updated by JS -->
+                </ul>
+            </div>
+
+            <div id="dashboard">
+                <h3>🏆 英雄榜 (各难度最佳记录)</h3>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                    <thead>
+                        <tr style="background-color: #f1f1f1;">
+                            <th style="padding: 8px; border: 1px solid #ddd;">难度</th>
+                            <th style="padding: 8px; border: 1px solid #ddd;">冠军</th>
+                            <th style="padding: 8px; border: 1px solid #ddd;">成绩</th>
+                        </tr>
+                    </thead>
+                    <tbody id="record-list">
+                        <tr><td colspan="3">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Game Area -->
+        <div id="game-screen" class="hidden">
+            <div class="stats">
+                <div>⏱️ 时间: <span id="timer">0.0</span>s</div>
+                <div id="target-display">🎯 目标: <span id="next-num">1</span></div>
+            </div>
+            
+            <!-- Schulte Board -->
+            <div id="game-board"></div>
+
+            <!-- Stroop Board -->
+            <div id="stroop-board" class="hidden">
+                <div id="stroop-word">RED</div>
+                <div class="stroop-options">
+                    <button class="stroop-btn" style="background-color: red;" onclick="handleStroopClick('red')"></button>
+                    <button class="stroop-btn" style="background-color: green;" onclick="handleStroopClick('green')"></button>
+                    <button class="stroop-btn" style="background-color: blue;" onclick="handleStroopClick('blue')"></button>
+                    <button class="stroop-btn" style="background-color: #f1c40f;" onclick="handleStroopClick('yellow')"></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Result Screen -->
+        <div id="result-screen" class="hidden">
+            <h2>🎉 任务完成!</h2>
+            <p>耗时: <span id="final-time" style="font-size: 2rem; color: #2ecc71; font-weight: bold;"></span> 秒</p>
+            <button onclick="showMenu()">返回主控台</button>
+        </div>
+    </div>
+
+    <script>
+        let timerInterval;
+        let startTime;
+        let currentNumber = 1;
+        let gridSize = 5;
+        let isPlaying = false;
+
+        // --- Game Mode Logic ---
+        let currentGameMode = 'schulte'; // 'schulte' or 'stroop'
+        let stroopCount = 0;
+        let stroopTarget = 20;
+        let stroopCurrentColor = '';
+
+        // Load records on start
+        window.onload = function() {
+            loadRecords();
+            // Initialize default mode UI
+            switchMode('schulte');
+        };
+
+        function switchMode(mode) {
+            currentGameMode = mode;
+            
+            // Update Buttons
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            // Find the button that was clicked (if any) or default
+            const buttons = document.querySelectorAll('.mode-btn');
+            if (mode === 'schulte') buttons[0].classList.add('active');
+            else buttons[1].classList.add('active');
+
+            // Update UI
+            if (mode === 'schulte') {
+                document.getElementById('game-subtitle').innerText = '舒尔特方格训练';
+                document.getElementById('schulte-controls').style.display = 'block';
+                document.getElementById('game-instructions').innerHTML = `
+                    <li style="margin-bottom: 5px;">点击“开始任务”后，屏幕上会出现打乱的数字。</li>
+                    <li style="margin-bottom: 5px;">请用最快的速度，<strong>按顺序（1, 2, 3...）</strong>点击所有数字。</li>
+                    <li>点错了会有震动提示哦，加油！</li>
+                `;
+            } else {
+                document.getElementById('game-subtitle').innerText = '颜色干扰挑战';
+                document.getElementById('schulte-controls').style.display = 'none';
+                document.getElementById('game-instructions').innerHTML = `
+                    <li style="margin-bottom: 5px;">屏幕上会出现一个表示颜色的字（如“红”），但它的颜色可能是绿色的。</li>
+                    <li style="margin-bottom: 5px;">请点击下方按钮，选择<strong>字的颜色</strong>（而不是字的含义）。</li>
+                    <li>目标：尽快完成 20 次正确选择！</li>
+                `;
+            }
+            loadRecords();
+        }
+
+        function startGame() {
+            const nameInput = document.getElementById('player-name');
+            const name = nameInput.value.trim();
+            
+            if (!name) {
+                alert("请先输入你的名字，成为专注力小英雄！");
+                nameInput.focus();
+                return;
+            }
+
+            // Face Auth Check (Simplified)
+            if (typeof isModelLoaded !== 'undefined' && isModelLoaded) {
+                const video = document.getElementById('webcam');
+                if (video.srcObject && !video.paused && !video.ended) {
+                     faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor().then(detection => {
+                         if (detection) {
+                             const descriptor = Array.from(detection.descriptor);
+                             fetch('/api/register_face', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ name: name, descriptor: descriptor })
+                            });
+                         }
+                         stopWebcam();
+                     });
+                }
+            }
+
+            // UI Switch
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+
+            startTime = Date.now();
+            timerInterval = setInterval(updateTimer, 100);
+            isPlaying = true;
+
+            if (currentGameMode === 'schulte') {
+                gridSize = parseInt(document.getElementById('grid-size').value);
+                currentNumber = 1;
+                document.getElementById('target-display').innerHTML = '🎯 目标: <span id="next-num">1</span>';
+                document.getElementById('game-board').classList.remove('hidden');
+                document.getElementById('stroop-board').classList.add('hidden');
+                generateGrid(gridSize);
+            } else {
+                stroopCount = 0;
+                document.getElementById('target-display').innerHTML = `🎯 进度: <span id="stroop-progress">0</span>/${stroopTarget}`;
+                document.getElementById('game-board').classList.add('hidden');
+                document.getElementById('stroop-board').classList.remove('hidden');
+                nextStroopChallenge();
+            }
+        }
+
+        // --- Stroop Logic ---
+        const COLORS = ['red', 'green', 'blue', 'yellow'];
+        const COLOR_NAMES = {'red': '红', 'green': '绿', 'blue': '蓝', 'yellow': '黄'};
+        const COLOR_HEX = {'red': '#e74c3c', 'green': '#2ecc71', 'blue': '#3498db', 'yellow': '#f1c40f'};
+
+        function nextStroopChallenge() {
+            const wordColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+            const inkColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+            
+            stroopCurrentColor = inkColor;
+
+            const wordEl = document.getElementById('stroop-word');
+            wordEl.innerText = COLOR_NAMES[wordColor];
+            wordEl.style.color = COLOR_HEX[inkColor];
+        }
+
+        function handleStroopClick(color) {
+            if (!isPlaying) return;
+
+            if (color === stroopCurrentColor) {
+                playCorrectSound();
+                stroopCount++;
+                document.getElementById('stroop-progress').innerText = stroopCount;
+                
+                if (stroopCount >= stroopTarget) {
+                    endGame();
+                } else {
+                    nextStroopChallenge();
+                }
+            } else {
+                playWrongSound();
+                // Optional: Penalty time? Or just shake screen?
+                const wordEl = document.getElementById('stroop-word');
+                wordEl.style.animation = 'shake 0.4s';
+                setTimeout(() => wordEl.style.animation = '', 400);
+            }
+        }
+
+        function generateGrid(size) {
+            const board = document.getElementById('game-board');
+            board.innerHTML = '';
+            board.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+
+            const numbers = Array.from({length: size * size}, (_, i) => i + 1);
+            shuffleArray(numbers);
+
+            numbers.forEach(num => {
+                const cell = document.createElement('div');
+                cell.className = 'grid-cell';
+                cell.innerText = num;
+                cell.onclick = () => handleCellClick(cell, num);
+                board.appendChild(cell);
+            });
+        }
+
+        function handleCellClick(cell, num) {
+            if (!isPlaying) return;
+
+            if (num === currentNumber) {
+                // Correct
+                playCorrectSound();
+                cell.classList.add('correct'); // Or make it disappear
+                currentNumber++;
+                document.getElementById('next-num').innerText = currentNumber;
+
+                if (currentNumber > gridSize * gridSize) {
+                    endGame();
+                }
+            } else {
+                // Wrong
+                playWrongSound();
+                cell.classList.add('wrong');
+                setTimeout(() => cell.classList.remove('wrong'), 400);
+            }
+        }
+
+        // Sound Effects using Web Audio API
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playCorrectSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+            oscillator.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.1); // Slide up to A6
+            
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.3);
+        }
+
+        function playWrongSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.setValueAtTime(150, audioCtx.currentTime);
+            oscillator.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.2); // Slide down
+            
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.2);
+        }
+
+        function endGame() {
+            clearInterval(timerInterval);
+            isPlaying = false;
+            const endTime = Date.now();
+            const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+            document.getElementById('final-time').innerText = duration;
+            
+            // Save record
+            saveRecord(currentGameMode, parseFloat(duration));
+
+            // UI Switch
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.remove('hidden');
+        }
+
+        function updateTimer() {
+            const now = Date.now();
+            const diff = ((now - startTime) / 1000).toFixed(1);
+            document.getElementById('timer').innerText = diff;
+        }
+
+        function showMenu() {
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('menu-screen').classList.remove('hidden');
+            loadRecords();
+        }
+
+        // Utils
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        // API Calls
+        async function saveRecord(type, score) {
+            const playerName = document.getElementById('player-name').value.trim();
+            let difficulty = 'Standard';
+            if (type === 'schulte') {
+                difficulty = document.getElementById('grid-size').value;
+            } else {
+                difficulty = '20'; // Hardcoded for now
+            }
+
+            try {
+                await fetch('/api/record', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        game_type: type, 
+                        score: score,
+                        player_name: playerName,
+                        difficulty: difficulty
+                    })
+                });
+            } catch (e) {
+                console.error("Save failed", e);
+            }
+        }
+
+        async function loadRecords() {
+            try {
+                const res = await fetch(`/api/records?game_type=${currentGameMode}`);
+                const data = await res.json();
+                const list = document.getElementById('record-list');
+                
+                if (data.length === 0) {
+                    list.innerHTML = '<tr><td colspan="3">暂无记录，快来挑战吧！</td></tr>';
+                    return;
+                }
+
+                list.innerHTML = data.map(r => {
+                    let diffLabel = r.difficulty;
+                    if (currentGameMode === 'schulte') {
+                        diffLabel = `${r.difficulty}x${r.difficulty}`;
+                    } else {
+                        diffLabel = '20次挑战';
+                    }
+                    
+                    return `
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 8px;">${diffLabel}</td>
+                        <td style="padding: 8px; font-weight: bold; color: #e67e22;">${r.player_name}</td>
+                        <td style="padding: 8px;">${r.score > 0 ? r.score + 's' : '-'}</td>
+                    </tr>
+                `}).join('');
+            } catch (e) {
+                console.error("Load failed", e);
+                document.getElementById('record-list').innerHTML = '<tr><td colspan="3">加载失败</td></tr>';
+            }
+        }
+
+        // --- Face Auth Logic ---
+        let isModelLoaded = false;
+
+        async function loadFaceModels() {
+            if (isModelLoaded) return;
+            const status = document.getElementById('face-status');
+            status.innerText = "正在加载人脸模型...";
+            try {
+                await faceapi.nets.ssdMobilenetv1.loadFromUri('/static/models');
+                await faceapi.nets.faceLandmark68Net.loadFromUri('/static/models');
+                await faceapi.nets.faceRecognitionNet.loadFromUri('/static/models');
+                isModelLoaded = true;
+                status.innerText = "模型加载完成";
+            } catch (e) {
+                console.error(e);
+                status.innerText = "模型加载失败，请检查网络或文件";
+            }
+        }
+
+        async function startFaceAuth() {
+            const videoContainer = document.getElementById('video-container');
+            const video = document.getElementById('webcam');
+            const status = document.getElementById('face-status');
+            
+            videoContainer.style.display = 'block';
+            status.innerText = "正在启动摄像头...";
+
+            await loadFaceModels();
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+                video.srcObject = stream;
+                
+                video.onplay = async () => {
+                    status.innerText = "正在识别...";
+                    // Detect face
+                    const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
+                    
+                    if (detection) {
+                        status.innerText = "检测到人脸，正在比对...";
+                        // Send descriptor to backend
+                        const descriptor = Array.from(detection.descriptor);
+                        const res = await fetch('/api/login_face', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ descriptor: descriptor })
+                        });
+                        const data = await res.json();
+                        
+                        if (data.match) {
+                            document.getElementById('player-name').value = data.name;
+                            status.innerText = `欢迎回来，${data.name}！`;
+                            status.style.color = 'green';
+                            stopWebcam();
+                        } else {
+                            status.innerText = "未识别到用户，请手动输入名字开始游戏（将自动注册）";
+                            status.style.color = 'orange';
+                            // Keep webcam open? Or close? Let's close it after 3s
+                            setTimeout(stopWebcam, 3000);
+                        }
+                    } else {
+                        status.innerText = "未检测到人脸，请正对摄像头";
+                    }
+                };
+            } catch (e) {
+                console.error(e);
+                status.innerText = "无法访问摄像头";
+            }
+        }
+
+        function stopWebcam() {
+            const video = document.getElementById('webcam');
+            const stream = video.srcObject;
+            if (stream) {
+                const tracks = stream.getTracks();
+                tracks.forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            document.getElementById('video-container').style.display = 'none';
+        }
+
+        // Hook into startGame to register face if new
+        const originalStartGame = startGame;
+        startGame = async function() {
+            const nameInput = document.getElementById('player-name');
+            const name = nameInput.value.trim();
+            
+            if (!name) {
+                alert("请先输入你的名字，成为专注力小英雄！");
+                nameInput.focus();
+                return;
+            }
+
+            // Try to capture face for registration if webcam is active or we want to force it?
+            // For now, let's just check if we have a face descriptor from the login attempt?
+            // Or better: If user manually typed name, we try to capture face in background if possible?
+            // To keep it simple: If they used "Face Login" and failed, we already have their face? 
+            // No, let's just try to capture one frame quickly if they start game.
+            
+            if (isModelLoaded) {
+                // Try to capture face silently if possible, or just skip for now to avoid complexity.
+                // Let's do a quick check: if webcam is running, capture.
+                const video = document.getElementById('webcam');
+                if (video.srcObject && !video.paused && !video.ended) {
+                     const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
+                     if (detection) {
+                         const descriptor = Array.from(detection.descriptor);
+                         // Register
+                         fetch('/api/register_face', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: name, descriptor: descriptor })
+                        });
+                     }
+                     stopWebcam();
+                }
+            }
+
+            originalStartGame();
+        }
+    </script>
+</body>
+</html>
